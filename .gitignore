@@ -1,0 +1,11 @@
+*.tsbuildinfo
+*.png
+*.gif
+vite.config.ts
+*.webp
+*.txt
+error_log
+secondaryimages
+videos
+images
+.vscode

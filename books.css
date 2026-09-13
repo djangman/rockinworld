@@ -1,0 +1,251 @@
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Georgia', serif;
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 60px 20px;
+    min-height: 100vh;
+}
+
+.accordion {
+    width: 100%;
+    max-width: 640px;
+}
+
+/* ── H2 Toggle Button ── */
+.accordion__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 18px 28px;
+    background: linear-gradient(135deg, #16213e 0%, #0f3460 60%, #533483 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: filter 0.25s ease, box-shadow 0.25s ease;
+    box-shadow: 0 4px 20px rgba(83, 52, 131, 0.45);
+}
+
+.accordion__trigger:hover {
+    filter: brightness(1.15);
+    box-shadow: 0 6px 28px rgba(83, 52, 131, 0.7);
+}
+
+.accordion__trigger h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #e0d7f5;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+}
+
+.accordion__icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.35s ease, background 0.25s ease;
+}
+
+.accordion__icon svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: #c9b8f0;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke 0.25s;
+}
+
+/* Open state */
+.accordion__trigger[aria-expanded="true"] .accordion__icon {
+    transform: rotate(180deg);
+    background: rgba(255, 255, 255, 0.18);
+}
+
+/* ── Collapsible Panel ── */
+.accordion__panel {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.35s ease,
+        margin 0.35s ease;
+    opacity: 0;
+    margin-top: 0;
+}
+
+.accordion__panel.is-open {
+    max-height: 1200px;
+    /* tall enough for any list */
+    opacity: 1;
+    margin-top: 10px;
+}
+
+/* .accordion__panel-inner {
+    background: linear-gradient(160deg, #16213e 0%, #0d1b2a 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 8px 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+} */
+
+.accordion__panel-inner {
+    position: relative;
+
+    /* Background image — swap in your actual filename/path */
+    background-image:
+        /* Dark overlay gradient on top of the image to keep text readable */
+        linear-gradient(rgba(13, 27, 42, 0.78),
+            rgba(13, 27, 42, -0.22)),
+        url('images/library2.png');
+
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+
+    /* The rest of your existing styles stay intact */
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 8px 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Book List ── */
+.book-list {
+    list-style: none;
+}
+
+.book-list li {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 26px;
+    color: white;
+    font-size: 1.2rem;
+    line-height: 1.4;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.book-list li:last-child {
+    border-bottom: none;
+}
+
+.book-list li:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #f0eaff;
+}
+
+.book-list li::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    flex-shrink: 0;
+}
+
+.book-list .empty {
+    color: #6b6580;
+    font-style: italic;
+    justify-content: center;
+}
+
+.book-list .empty::before {
+    display: none;
+}
+
+.book-edit-row .book-save-btn,
+.amazon-edit-row .amazon-save-btn {
+   width:80px;
+   font-size: larger;
+   background: linear-gradient(135deg, #a78bfa, #60a5fa);
+   color:white;
+   padding: 10px 0;
+}
+
+
+.amazon-edit-row,
+.book-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 26px;
+}
+
+.amazon-edit-row input,
+.book-edit-row input {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color:white;
+    font-size: 1.2rem;
+    padding: 10px 26px;
+    background: rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ── Book List ── */
+.amazon-list {
+    list-style: none;
+}
+
+.amazon-list li {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 26px;
+    color: white;
+    font-size: 1.2rem;
+    line-height: 1.4;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.amazon-list li:last-child {
+    border-bottom: none;
+}
+
+.amazon-list li:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #f0eaff;
+}
+
+.amazon-list li::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #a78bfa, #60a5fa);
+    flex-shrink: 0;
+}
+
+.amazon-list .empty {
+    color: #6b6580;
+    font-style: italic;
+    justify-content: center;
+}
+
+.amazon-list .empty::before {
+    display: none;
+}

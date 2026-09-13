@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scene Reel Randomizer</title>
+  <script>
+    const scenes = [
+	  "Reading my happy customer comments on my laptop screen while standing in my luxury hotel kitchenette with a stunning city view and bag containing a delicious breakfast ready to eat and a cup of coffee.",
+	  "Checking into  luxury hotel room with a stunning city view, unpacking your bags with a smile.",
+	  "Sitting in the hotel's restaurant, enjoying a gourmet meal and a glass of fine wine, writing some notes in your attractive planner notebook.",
+      "Standing in your sleek modern kitchen, the smell of low-carb bread baking, stainless appliances gleaming under soft lights.",
+      "Logging into your mortgage lender’s site, smiling as you submit a large lump-sum payment toward your mortgage and picturing it paid off sooner.",
+      "Sliding into the driver’s seat of a shiny car less than 5 years old, leather interior fresh, ready for a road trip.",
+      "Boarding a first-class flight, glass of champagne in hand, feeling gratitude as you settle into your seat.",
+      "Sitting in a cozy café in a small U.S. town, laptop open, coffee steaming, while you work on your thriving business.",
+      "Chopping a steak on a spacious beautiful countertop, admiring the gadgets that make cooking fun and easy.",
+      "With my LIV watch on, driving along a beautiful coast with windows down, music playing, feeling absolute freedom.",
+      "Checking your bank balance online and smiling at the lavish monthly income deposits.",
+      "Exploring a bustling street market overseas, tasting exotic foods, laughing with new friends.",
+      "Relaxing in your living room, floor-to-ceiling windows letting in sunlight, sipping coffee in peace.",
+      "Logging into your mortgage lender website again, joyfully adding another large payment and visualizing the balance dropping.",
+      "Inviting friends over to your home, showing them your modern kitchen and preparing a delicious low-carb feast together.",
+      "Enjoying a first-class lounge before a trip, savoring gourmet snacks and drinks.",
+      "Working at a café in Paris, the Eiffel Tower visible in the distance, as your business runs smoothly online.",
+      "Relaxing in a hot tub on your deck, mountain view stretching endlessly in front of you.",
+      "Picking up the latest kitchen gadget you’ve wanted, unboxing it with excitement knowing your income easily covers it.",
+      "Walking through your spacious house, touching the polished countertops and appreciating the lifestyle you’ve created.",
+      "Sitting in a modern café in Tokyo, latte art on the table, while checking your thriving business stats.",
+      "Taking a leisurely road trip across the U.S., stopping at diners and cafés while working remotely.",
+      "Joyfully transferring money online into savings and investments, knowing your future is secure.",
+	  "Cooking in your modern kitchen with sleek appliances.",
+		"Driving your under-5-year-old car down a scenic coastal highway.",
+		"Logging into your mortgage lender website and joyfully paying $20,000.",
+		"In my reclined seat, noone next to you in your first class seat, enjoying your wine and snacks.",
+		"Sitting in a cozy café working on your thriving online business.",
+		"Relaxing in your modern kitchen, preparing a tasty low-carb recipe.",
+		"Leisurely road trip through the U.S., stopping at a mountain café.",
+		"Standing on your balcony, admiring your spacious home and success.",
+		"Paying off another big chunk of your mortgage, smiling with relief.",
+		"Scene 10: Traveling abroad, laughing with new friends at a dinner table."
+    ];
+	
+    let favorites = [];
+
+    function loadFavorites() {
+      const stored = localStorage.getItem("favorites");
+      if (stored) {
+        favorites = JSON.parse(stored);
+        renderFavorites();
+      }
+    }
+
+    function saveFavorites() {
+      localStorage.setItem("favorites", JSON.stringify(favorites));
+    }
+
+    function getRandomScene() {
+      const randomIndex = Math.floor(Math.random() * scenes.length);
+      const scene = scenes[randomIndex];
+      document.getElementById("scene").textContent = scene;
+      document.getElementById("favoriteButton").disabled = false;
+    }
+
+    function saveFavorite() {
+      const currentScene = document.getElementById("scene").textContent;
+      if (currentScene && !favorites.includes(currentScene)) {
+        favorites.push(currentScene);
+        saveFavorites();
+        renderFavorites();
+      }
+    }
+
+	function renderFavorites() {
+	  const list = document.getElementById("favoritesList");
+	  list.innerHTML = "";
+	  favorites.forEach((fav, idx) => {
+		const li = document.createElement("li");
+		const span = document.createElement("span");
+		span.textContent = fav;
+		const btn = document.createElement("button");
+		btn.textContent = "X";
+		btn.style.marginRight = "10px";
+		btn.onclick = function() {
+		  favorites.splice(idx, 1);
+		  saveFavorites();
+		  renderFavorites();
+		};
+		li.appendChild(btn);
+		li.appendChild(span);
+		list.appendChild(li);
+	  });
+	}
+
+    window.onload = loadFavorites;
+  </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      text-align: center;
+      line-height: 1.6;
+    }
+    #scene {
+      margin: 20px 0;
+      font-size: 1.2em;
+      padding: 15px;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      background: #f9f9f9;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 1em;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background: #4caf50;
+      color: white;
+    }
+    button:disabled {
+      background: #aaa;
+      cursor: not-allowed;
+    }
+    h2 {
+      margin-top: 40px;
+    }
+    ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    li {
+      background: #eef;
+      margin: 5px 0;
+      padding: 10px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Scene Reel Randomizer</h1>
+  <p>Click below to reveal a new visualization scene.</p>
+  <button onclick="getRandomScene()">🎲 Show Random Scene</button>
+  <div id="scene">Your scene will appear here.</div>
+  <button id="favoriteButton" onclick="saveFavorite()" disabled>⭐ Save to Favorites</button>
+
+  <h2>My Favorite Scenes</h2>
+  <ul id="favoritesList"></ul>
+</body>
+</html>
