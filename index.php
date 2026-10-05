@@ -1,6 +1,8 @@
 <?php
 $goodsleep = '';
 $goodsleepStatus = '';
+$sitepwstuff = '';
+$sitepwstuffStatus = '';
 
 try {
   $pdo = new PDO(
@@ -38,8 +40,51 @@ try {
   } else {
     $goodsleep = (string)($pdo->query('SELECT goodsleep FROM paragraph_sections LIMIT 1')->fetchColumn() ?: '');
   }
+
+  
+
+  try {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sitepwstuff'])) {
+      $sitepwstuff = trim($_POST['sitepwstuff']);
+      error_log('[rockinworld] sitepwstuff POST received; length=' . strlen($sitepwstuff));
+
+      $rowExists = (bool)$pdo->query('SELECT 1 FROM paragraph_sections LIMIT 1')->fetchColumn();
+      if ($rowExists) {
+        $statement = $pdo->prepare('UPDATE paragraph_sections SET sitepwstuff = ?');
+        $statement->execute([$sitepwstuff]);
+      } else {
+        $statement = $pdo->prepare('INSERT INTO paragraph_sections (sitepwstuff) VALUES (?)');
+        $statement->execute([$sitepwstuff]);
+      }
+      $affectedRows = $statement->rowCount();
+      error_log('[rockinworld] sitepwstuff UPDATE succeeded; affected_rows=' . $affectedRows);
+      $sitepwstuffStatus = 'Saved. (' . $affectedRows . ' row(s) changed)';
+
+      try {
+        $savedSitepwstuff = $pdo->query('SELECT sitepwstuff FROM paragraph_sections LIMIT 1')->fetchColumn();
+        if ($savedSitepwstuff === false) {
+          error_log('[rockinworld] verification failed: paragraph_sections returned no rows');
+          $sitepwstuffStatus = 'Saved, but verification found no paragraph_sections row.';
+        } elseif ((string)$savedSitepwstuff !== $sitepwstuff) {
+          error_log('[rockinworld] verification mismatch; expected_length=' . strlen($sitepwstuff) . ', actual_length=' . strlen((string)$savedSitepwstuff));
+          $sitepwstuffStatus = 'Saved, but verification did not match.';
+        }
+      } catch (Throwable $e) {
+        error_log('[rockinworld] sitepwstuff verification failed: ' . $e->getMessage());
+        $sitepwstuffStatus = 'Saved, but verification could not be completed.';
+      }
+    } else {
+      $sitepwstuff = (string)($pdo->query('SELECT sitepwstuff FROM paragraph_sections LIMIT 1')->fetchColumn() ?: '');
+    }
+  } catch (Throwable $e) {
+    error_log('[rockinworld] sitepwstuff database operation failed: ' . $e->getMessage());
+    $sitepwstuffStatus = 'Database operation failed.';
+  }
 } catch (Throwable $e) {
   $goodsleepStatus = 'Database connection failed.';
+  if ($sitepwstuffStatus === '') {
+    $sitepwstuffStatus = 'Database connection failed.';
+  }
 }
 ?>
 <!DOCTYPE html>
@@ -159,9 +204,40 @@ try {
     text-align: center;
     padding: 5px;
     line-height: 1.5;
+    margin-bottom: 10px;
   }
   .hero-text ul { text-align: left; margin: 10px 0 0; padding-left: 30px; }
   .hero-text ul li { margin-bottom: 8px; }
+  .priority-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 0 10px;
+    width: 100%;
+    
+  }
+  
+  .priority-row iframe {
+    flex: 0 0 55%;
+    /* width: 45%; */
+    /* min-height: 700px; */
+    height: 750px;
+    border: 0;
+    display: block;
+    border: 2px solid #bfe3f6;
+  }
+  .priority-row .hero-text {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 18px;
+    text-align: left;
+    display: block;
+    background: linear-gradient(135deg, #edf9ff 0%, #dff3ff 100%);
+    border: 2px solid #bfe3f6;
+    border-radius: 10px;
+    padding: 18px 18px 12px;
+    box-shadow: 0 4px 12px rgba(85, 136, 170, 0.08);
+  }
 
   /* ── Separator ── */
   .separator { text-align: center; padding: 5px 0; }
@@ -233,6 +309,8 @@ try {
     .sentence-text  { font-size: 16px; }
     .sentence-input { font-size: 15px; }
     .hero-text { font-size: 22px; }
+    .priority-row { flex-direction: column; }
+    .priority-row iframe { width: 100%; flex-basis: auto; }
   }
 
   #identity-section li { margin-bottom: 6px; }
@@ -350,23 +428,39 @@ try {
     <a href="#links-section" style="color: #1a3a5c; font-weight: 700; text-decoration: underline;">Jump to Links</a>
   </p>
 
+<div class="priority-row">
+    <?php include "embed_todoapp/todos.php"; ?>
+
+    <div class="hero-text">
+      <strong style="color: blue;">The Most Important Priorities</strong>
+      <ul>
+        <li>Workout and stay on carnivore diet</li>
+        <li>Nofap and Meditation</li>
+        <li>Being the Identity of The Fulfilled Steve that is on a perpetual Vacation, with the Fun, Big Stuff even if the outside is not pleasing today!</li>
+        <li>There is no concern over the outcome of any actions I'm taking. All I need to do is feel grateful for the end outcome, and take action in the NOW with bliss and peace and joy.</li>
+        <li>My happiness and outward circumstances are thankfully not reliant on google, companies, recruiters, mortgage companies, landlords, women out there ... nope! I decide baby and I love that.</li>
+      </ul>
+    </div>
+</div>
+
+
   <div class="sub-grid">
-  <div class="hint-text" style="grid-column: 1 / -1; color: blue;font-size: 22px; font-family: 'Montserrat', 'Segoe UI', Tahoma, Geneva, sans-serif; font-weight: 600;">Today: <?php echo date('m/d/Y'); ?></div>
-    <div class="sub-card">
+     <div class="hint-text" style="grid-column: 1 / -1; color: blue;font-size: 22px; font-family: 'Montserrat', 'Segoe UI', Tahoma, Geneva, sans-serif; font-weight: 600;">Today: <?php echo date('m/d/Y'); ?></div>
+<!-- <div class="sub-card">
         <div class="sub-header kindle-header">
             <h2>📖 Kindle Unlimited</h2>
         </div>
         <ul class="date-list" id="kindle-list"></ul>
-    </div>
+     </div>-->
 
-    <div class="sub-card">
+     <div class="sub-card">
         <div class="sub-header audible-header">
             <h2>🎧 Audible</h2>
         </div>
         <ul class="date-list" id="audible-list"></ul>
-    </div>
+    </div> 
 
-</div>
+</div> 
 
   
 
@@ -385,6 +479,36 @@ try {
       <?php endif; ?>
     </form>
   </div>
+
+  <div style="background: linear-gradient(135deg, rgba(138, 175, 199, 0.1), rgba(200, 220, 240, 0.1)); border-left: 4px solid #8aafc7; padding: 24px; margin: 20px 0; border-radius: 8px; font-family: 'Segoe UI', Tahoma, Geneva, sans-serif;">
+    <form method="post">
+      <input type="hidden" name="sitepwstuff" id="sitepwstuff-value" value="<?php echo htmlspecialchars($sitepwstuff, ENT_QUOTES, 'UTF-8'); ?>">
+      <div id="sitepwstuff-display" title="Double-click to edit" style="width:100%; min-height:190px; box-sizing:border-box; white-space:pre-wrap; font-size:19px; line-height:1.8; color:#2c3e50; margin:0; font-weight:500; font-family:inherit; cursor:text;"><?php echo htmlspecialchars($sitepwstuff, ENT_QUOTES, 'UTF-8'); ?></div>
+      <button type="submit" style="margin-top:10px; padding:8px 18px; cursor:pointer;">Save</button>
+      <?php if ($sitepwstuffStatus !== ''): ?>
+        <span style="margin-left:10px; color:#2c3e50;"><?php echo htmlspecialchars($sitepwstuffStatus, ENT_QUOTES, 'UTF-8'); ?></span>
+      <?php endif; ?>
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      const display = document.getElementById('sitepwstuff-display');
+      const hiddenValue = document.getElementById('sitepwstuff-value');
+
+      display.addEventListener('dblclick', function () {
+        const textarea = document.createElement('textarea');
+        textarea.rows = 9;
+        textarea.value = display.textContent;
+        textarea.style.cssText = 'width:100%; font-size:19px; line-height:1.8; color:#2c3e50; margin:0; font-weight:500; font-family:inherit;';
+        textarea.addEventListener('input', function () {
+          hiddenValue.value = textarea.value;
+        });
+        display.replaceWith(textarea);
+        textarea.focus();
+      });
+    }());
+  </script>
 
   <script>
     (function () {
@@ -445,16 +569,7 @@ try {
             </li>
         </ol>
     </div>
-    <div class="hero-text">
-      <strong style="color: blue;">The Most Important Priorities</strong>
-      <ul>
-        <li>Continuing the body reshaping</li>
-        <li>Nofap and Meditation</li>
-        <li>Being the Identity of The Fulfilled Steve that is on a perpetual Vacation, with the Fun, Big Stuff even if the outside is not pleasing today!</li>
-        <li>There is no concern over the outcome of any actions I'm taking. All I need to do is feel grateful for the end outcome, and take action in the NOW with bliss and peace and joy.</li>
-        <li>My happiness and outward circumstances are thankfully not reliant on google, companies, recruiters, mortgage companies, landlords, women out there ... nope! I decide baby and I love that.</li>
-      </ul>
-    </div>
+    
   </div>
 
   <!-- ── SEPARATOR ─────────────────────────────────────── -->
@@ -608,11 +723,15 @@ try {
         { date: '2026-09-01', note: 'End the subscription today!' },
     ];
     const audibleDates = [
-        { date: '2026-07-28', note: '8 weeks before Audible sub ends' },
-        { date: '2026-08-11', note: '6 weeks before Audible sub ends' },
-        { date: '2026-08-25', note: '4 weeks before Audible sub ends' },
-        { date: '2026-09-08', note: '2 weeks before Audible sub ends' },
-        { date: '2026-09-22', note: 'End sub today (or by Sep 29)' },
+        { date: '2026-10-05', note: 'Sixteen weeks before Sub ends' },
+        { date: '2026-10-19', note: 'Fourteen weeks before Sub ends' },
+        { date: '2026-11-02', note: 'Twelve weeks before Sub ends' },
+        { date: '2026-11-16', note: 'Ten weeks before Sub Ends' },
+        { date: '2026-11-30', note: 'Eight weeks before Sub Ends' },
+        { date: '2026-12-14', note: 'Six weeks before Sub Ends' },
+        { date: '2026-12-28', note: 'Four weeks before Sub Ends' },
+        { date: '2027-01-11', note: 'Two weeks before Sub Ends' },
+        { date: '2027-01-18', note: 'One week before Sub Ends' },
     ];
 
     const today = new Date();
@@ -650,7 +769,7 @@ try {
         });
     }
 
-    render(kindleDates, 'kindle-list');
+    //render(kindleDates, 'kindle-list');
     render(audibleDates, 'audible-list');
 })();
 
