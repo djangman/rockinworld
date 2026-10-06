@@ -9,3 +9,5 @@ secondaryimages
 videos
 images
 .vscode
+embed_todoapp/backups
+embed_todoapp/db_values.php

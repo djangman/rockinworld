@@ -18,11 +18,18 @@ $todos_when_options = [
     'Next Friday', 'Next Saturday', 'Next Sunday',
     'Next Weekend', 'Next Month',
 ];
+// type value => section heading
+$todos_types = [
+    'normal'    => 'Normal',
+    'repeating' => 'Repeating',
+    'future'    => 'Future Tasks',
+];
 ?>
 <style>
 #td-app { --td-accent:#3b6ef5; --td-border:#e3e6ec; --td-muted:#7a8394; --td-bg:#fff; --td-hover:#f6f8fc;
-  max-width:760px; margin:1rem auto; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#1f2430; }
+  max-width:800px; margin:1rem auto; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#1f2430; }
 #td-app * { box-sizing:border-box; }
+#td-app [hidden], #td-app .td-hide { display:none !important; }
 #td-app h2 { margin:0 0 .75rem; font-size:1.3rem; }
 #td-app .td-add { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
 #td-app .td-add input[type=text] { flex:1 1 220px; }
@@ -31,11 +38,22 @@ $todos_when_options = [
 #td-app button { font:inherit; cursor:pointer; border:0; border-radius:8px; padding:.5rem .9rem; }
 #td-app .td-btn { background:var(--td-accent); color:#fff; font-weight:600; }
 #td-app .td-btn:disabled { opacity:.6; cursor:wait; }
+#td-app .td-loading { text-align:center; color:var(--td-muted); padding:1.5rem; border:1px solid var(--td-border); border-radius:10px; }
 #td-app table { width:100%; border-collapse:separate; border-spacing:0; border:1px solid var(--td-border); border-radius:10px; overflow:hidden; }
-#td-app th { text-align:left; font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--td-muted); background:#fafbfd; padding:.55rem .6rem; border-bottom:1px solid var(--td-border); }
+#td-app thead th { text-align:left; font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; color:var(--td-muted); background:#fafbfd; padding:.55rem .6rem; border-bottom:1px solid var(--td-border); }
 #td-app td { padding:.4rem .6rem; border-bottom:1px solid var(--td-border); vertical-align:middle; background:var(--td-bg); }
-#td-app tr:last-child td { border-bottom:0; }
-#td-app tbody tr:hover td { background:var(--td-hover); }
+#td-app tbody:last-of-type tr:last-child td { border-bottom:0; }
+#td-app tbody tr.td-row:hover td { background:var(--td-hover); }
+
+/* section headers */
+#td-app .td-sec-head th { --sec:#3b6ef5; text-align:left; padding:.7rem .8rem; font-size:.95rem; font-weight:700; letter-spacing:.02em;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--sec) 14%,#fff),#fff 70%); border-top:1px solid var(--td-border); border-bottom:1px solid var(--td-border); border-left:5px solid var(--sec); }
+#td-app tbody[data-type=repeating] .td-sec-head th { --sec:#12a37f; }
+#td-app tbody[data-type=future] .td-sec-head th { --sec:#8a5cf6; }
+#td-app .td-sec-count { display:inline-block; margin-left:.5rem; min-width:1.5rem; padding:0 .45rem; border-radius:999px; background:var(--sec,#3b6ef5); color:#fff; font-size:.75rem; line-height:1.4rem; text-align:center; vertical-align:middle; }
+#td-app .td-sec-empty td { text-align:center; color:var(--td-muted); font-style:italic; font-size:.9rem; padding:.9rem; }
+#td-app tbody.td-drop-over .td-sec-head th { box-shadow:inset 0 0 0 2px var(--sec); }
+
 #td-app .td-handle { width:28px; text-align:center; color:#a3abba; cursor:grab; user-select:none; font-size:1.1rem; }
 #td-app .td-check { width:44px; text-align:center; }
 #td-app .td-check input { width:18px; height:18px; cursor:pointer; accent-color:var(--td-accent); }
@@ -47,7 +65,8 @@ $todos_when_options = [
 #td-app .td-del button { background:transparent; color:#b4bbc9; padding:.2rem .5rem; font-size:1rem; }
 #td-app .td-del button:hover { color:#d64545; background:#fdeeee; }
 #td-app tr.td-dragging td { opacity:.4; background:#eaf0ff; }
-#td-app .td-empty { text-align:center; color:var(--td-muted); padding:1.5rem !important; }
+
+/* error banner */
 #td-app .td-error { display:flex; gap:.8rem; align-items:flex-start; margin:0 0 1rem; padding:.9rem 1rem; border-radius:12px;
   background:linear-gradient(135deg,#fff5f5,#ffeaea); border:1px solid #f5b8b8; border-left:5px solid #e04848;
   box-shadow:0 4px 14px rgba(224,72,72,.12); animation:td-in .2s ease-out; }
@@ -60,7 +79,30 @@ $todos_when_options = [
 #td-app .td-error-actions { display:flex; gap:.4rem; align-items:center; }
 #td-app .td-error-actions button { background:#fff; border:1px solid #e3b4b4; color:#a33; padding:.3rem .7rem; font-size:.85rem; }
 #td-app .td-error-actions .td-x { border:0; background:transparent; font-size:1.2rem; color:#a77; padding:.1rem .4rem; }
+
+/* custom confirm dialog */
+#td-app .td-modal-overlay { position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; padding:1rem;
+  background:rgba(20,26,40,.5); backdrop-filter:blur(2px); animation:td-fade .15s ease-out; }
+#td-app .td-modal-overlay.td-out { opacity:0; transition:opacity .15s; }
+#td-app .td-modal { width:100%; max-width:380px; background:#fff; border-radius:16px; padding:1.5rem 1.4rem 1.2rem; text-align:center;
+  box-shadow:0 20px 50px rgba(20,26,40,.35); animation:td-pop .18s ease-out; }
+#td-app .td-modal-icon { width:56px; height:56px; margin:0 auto .8rem; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:1.6rem; background:#fdeeee; }
+#td-app .td-modal-title { font-size:1.15rem; font-weight:700; margin-bottom:.4rem; }
+#td-app .td-modal-name { display:inline-block; max-width:100%; margin:.2rem 0 .4rem; padding:.25rem .6rem; border-radius:8px; background:#f2f4f9; font-weight:600;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom; }
+#td-app .td-modal-msg { color:var(--td-muted); font-size:.92rem; }
+#td-app .td-modal-actions { display:flex; gap:.6rem; margin-top:1.2rem; }
+#td-app .td-modal-actions button { flex:1; padding:.65rem; font-weight:600; }
+#td-app .td-modal-cancel { background:#eef1f7; color:#3a4357; }
+#td-app .td-modal-cancel:hover { background:#e2e7f1; }
+#td-app .td-modal-ok { background:#e04848; color:#fff; }
+#td-app .td-modal-ok:hover { background:#c93a3a; }
+#td-app .td-modal-actions button:focus-visible { outline:3px solid #c9d6fb; outline-offset:2px; }
+
 @keyframes td-in { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+@keyframes td-fade { from { opacity:0; } to { opacity:1; } }
+@keyframes td-pop { from { opacity:0; transform:scale(.94) translateY(8px); } to { opacity:1; transform:none; } }
 </style>
 
 <div id="td-app" data-backend="<?= htmlspecialchars($todos_backend_url, ENT_QUOTES) ?>">
@@ -69,7 +111,12 @@ $todos_when_options = [
 
   <div class="td-add">
     <input type="text" id="td-new-name" placeholder="What needs doing?" maxlength="255" autocomplete="off">
-    <select id="td-new-when">
+    <select id="td-new-type" title="Type">
+      <?php foreach ($todos_types as $val => $label): ?>
+        <option value="<?= htmlspecialchars($val, ENT_QUOTES) ?>"><?= htmlspecialchars($label) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <select id="td-new-when" title="When">
       <option value="">— No day —</option>
       <?php foreach ($todos_when_options as $opt): ?>
         <option value="<?= htmlspecialchars($opt, ENT_QUOTES) ?>"><?= htmlspecialchars($opt) ?></option>
@@ -78,13 +125,18 @@ $todos_when_options = [
     <button type="button" class="td-btn" id="td-add-btn">Add</button>
   </div>
 
-  <table>
+  <div class="td-loading" id="td-loading">Loading…</div>
+
+  <table id="td-table" hidden>
     <thead>
       <tr><th></th><th>Done</th><th>To-do</th><th>When</th><th></th></tr>
     </thead>
-    <tbody id="td-body">
-      <tr><td colspan="5" class="td-empty">Loading…</td></tr>
+    <?php foreach ($todos_types as $val => $label): ?>
+    <tbody class="td-section" id="td-sec-<?= htmlspecialchars($val, ENT_QUOTES) ?>" data-type="<?= htmlspecialchars($val, ENT_QUOTES) ?>">
+      <tr class="td-sec-head"><th colspan="5"><span class="td-sec-title"><?= htmlspecialchars($label) ?></span><span class="td-sec-count">0</span></th></tr>
+      <tr class="td-sec-empty"><td colspan="5">Nothing here yet. Add one above or drag a task in.</td></tr>
     </tbody>
+    <?php endforeach; ?>
   </table>
 </div>
 
@@ -93,11 +145,16 @@ $todos_when_options = [
   var root = document.getElementById('td-app');
   var BACKEND = root.getAttribute('data-backend');
   var WHEN = <?= json_encode($todos_when_options) ?>;
-  var body = document.getElementById('td-body');
+  var TYPES = <?= json_encode(array_keys($todos_types)) ?>;
+  var table = document.getElementById('td-table');
+  var loadingBox = document.getElementById('td-loading');
   var errBox = document.getElementById('td-errors');
   var newName = document.getElementById('td-new-name');
+  var newType = document.getElementById('td-new-type');
   var newWhen = document.getElementById('td-new-when');
   var addBtn = document.getElementById('td-add-btn');
+  var secs = {};
+  TYPES.forEach(function (t) { secs[t] = document.getElementById('td-sec-' + t); });
   var todos = [];
 
   /* ---------- ajax helper (no page loads, ever) ---------- */
@@ -164,13 +221,68 @@ $todos_when_options = [
   }
   function clearErrors() { errBox.innerHTML = ''; }
 
+  /* ---------- custom confirm dialog (replaces window.confirm) ---------- */
+  function mk(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) { e.className = cls; }
+    if (text !== undefined) { e.textContent = text; }
+    return e;
+  }
+
+  function confirmDialog(opts) {
+    return new Promise(function (resolve) {
+      var prevFocus = document.activeElement;
+      var overlay = mk('div', 'td-modal-overlay');
+      var dlg = mk('div', 'td-modal');
+      dlg.setAttribute('role', 'alertdialog');
+      dlg.setAttribute('aria-modal', 'true');
+      dlg.setAttribute('aria-labelledby', 'td-modal-title');
+
+      var title = mk('div', 'td-modal-title', opts.title || 'Are you sure?');
+      title.id = 'td-modal-title';
+      dlg.appendChild(mk('div', 'td-modal-icon', opts.icon || '🗑️'));
+      dlg.appendChild(title);
+      if (opts.name) { dlg.appendChild(mk('div', 'td-modal-name', opts.name)); }
+      if (opts.message) { dlg.appendChild(mk('div', 'td-modal-msg', opts.message)); }
+
+      var actions = mk('div', 'td-modal-actions');
+      var cancel = mk('button', 'td-modal-cancel', opts.cancelLabel || 'Cancel'); cancel.type = 'button';
+      var ok = mk('button', 'td-modal-ok', opts.confirmLabel || 'Confirm'); ok.type = 'button';
+      actions.appendChild(cancel); actions.appendChild(ok);
+      dlg.appendChild(actions);
+      overlay.appendChild(dlg);
+
+      function close(result) {
+        document.removeEventListener('keydown', onKey, true);
+        overlay.classList.add('td-out');
+        setTimeout(function () { overlay.remove(); }, 160);
+        if (prevFocus && prevFocus.focus) { try { prevFocus.focus(); } catch (e) {} }
+        resolve(result);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false); }
+        else if (e.key === 'Tab') {   // keep focus inside the dialog
+          e.preventDefault();
+          (document.activeElement === cancel ? ok : cancel).focus();
+        }
+      }
+      cancel.addEventListener('click', function () { close(false); });
+      ok.addEventListener('click', function () { close(true); });
+      overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) { close(false); } });
+      document.addEventListener('keydown', onKey, true);
+
+      root.appendChild(overlay);
+      cancel.focus();   // safe default for a destructive action
+    });
+  }
+
   /* ---------- rendering ---------- */
   function buildRow(t) {
     var tr = document.createElement('tr');
+    tr.className = 'td-row' + (t.done ? ' td-done' : '');
     tr.setAttribute('data-id', t.id);
-    if (t.done) { tr.className = 'td-done'; }
 
-    var h = document.createElement('td'); h.className = 'td-handle'; h.title = 'Drag to reorder'; h.textContent = '⋮⋮';
+    var h = document.createElement('td'); h.className = 'td-handle'; h.title = 'Drag to reorder or move to another section'; h.textContent = '⋮⋮';
     h.addEventListener('mousedown', function () { tr.draggable = true; });
     h.addEventListener('mouseup', function () { tr.draggable = false; });
 
@@ -217,13 +329,21 @@ $todos_when_options = [
     w.appendChild(sel);
 
     var d = document.createElement('td'); d.className = 'td-del';
-    var db = document.createElement('button'); db.type = 'button'; db.title = 'Delete'; db.textContent = '✕';
+    var db = document.createElement('button'); db.type = 'button'; db.title = 'Delete'; db.setAttribute('aria-label', 'Delete'); db.textContent = '✕';
     db.addEventListener('click', function () {
-      if (!confirm('Delete "' + t.todo_name + '"?')) { return; }
-      api('delete', { id: t.id }).then(function () {
-        todos = todos.filter(function (x) { return x.id !== t.id; });
-        render(); clearErrors();
-      }).catch(function (e) { showError(e); });
+      confirmDialog({
+        title: 'Delete this to-do?',
+        name: t.todo_name,
+        message: 'This can\'t be undone.',
+        confirmLabel: 'Delete',
+        cancelLabel: 'Keep it'
+      }).then(function (yes) {
+        if (!yes) { return; }
+        api('delete', { id: t.id }).then(function () {
+          todos = todos.filter(function (x) { return x.id !== t.id; });
+          render(); clearErrors();
+        }).catch(function (e) { showError(e); });
+      });
     });
     d.appendChild(db);
 
@@ -231,58 +351,101 @@ $todos_when_options = [
 
     /* drag events */
     tr.addEventListener('dragstart', function (e) {
-      dragRow = tr; startOrder = currentOrder();
+      dragRow = tr; dropped = false; startKey = currentItems().join(',');
       tr.classList.add('td-dragging');
       e.dataTransfer.effectAllowed = 'move';
       try { e.dataTransfer.setData('text/plain', String(t.id)); } catch (x) {}
     });
     tr.addEventListener('dragend', function () {
       tr.classList.remove('td-dragging'); tr.draggable = false;
-      var after = currentOrder();
+      clearDropHighlight();
+      var items = currentItems();
+      var wasDropped = dropped;
       dragRow = null;
-      if (after.join(',') !== startOrder.join(',')) { saveOrder(after); }
+      if (!wasDropped) { render(); return; }               // drag cancelled: restore
+      if (items.join(',') !== startKey) { saveOrder(items); }
     });
     return tr;
   }
 
+  function refreshSections() {
+    TYPES.forEach(function (type) {
+      var sec = secs[type];
+      var n = sec.querySelectorAll('tr.td-row').length;
+      sec.querySelector('.td-sec-count').textContent = n;
+      sec.querySelector('tr.td-sec-empty').classList.toggle('td-hide', n > 0);
+    });
+  }
+
   function render() {
-    body.innerHTML = '';
-    if (!todos.length) {
-      var tr = document.createElement('tr'); var td = document.createElement('td');
-      td.colSpan = 5; td.className = 'td-empty'; td.textContent = 'Nothing to do. Add your first item above.';
-      tr.appendChild(td); body.appendChild(tr); return;
-    }
-    todos.forEach(function (t) { body.appendChild(buildRow(t)); });
+    TYPES.forEach(function (type) {
+      var sec = secs[type];
+      Array.prototype.slice.call(sec.querySelectorAll('tr.td-row')).forEach(function (r) { r.remove(); });
+      todos.forEach(function (t) { if (t.todo_type === type) { sec.appendChild(buildRow(t)); } });
+    });
+    refreshSections();
   }
 
-  /* ---------- drag-and-drop reordering (native HTML5, no library) ---------- */
-  var dragRow = null, startOrder = [];
+  /* ---------- drag-and-drop (native HTML5, no library) ---------- */
+  var dragRow = null, startKey = '', dropped = false;
 
-  function currentOrder() {
-    return Array.prototype.map.call(body.querySelectorAll('tr[data-id]'), function (r) { return r.getAttribute('data-id'); });
+  // "id:type" for every row, in on-screen order (sections top to bottom).
+  function currentItems() {
+    var out = [];
+    TYPES.forEach(function (type) {
+      Array.prototype.forEach.call(secs[type].querySelectorAll('tr.td-row'), function (r) {
+        out.push(r.getAttribute('data-id') + ':' + type);
+      });
+    });
+    return out;
   }
 
-  body.addEventListener('dragover', function (e) {
+  function clearDropHighlight() {
+    TYPES.forEach(function (type) { secs[type].classList.remove('td-drop-over'); });
+  }
+
+  table.addEventListener('dragover', function (e) {
     if (!dragRow) { return; }
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    var rows = Array.prototype.filter.call(body.querySelectorAll('tr[data-id]'), function (r) { return r !== dragRow; });
+    var sec = e.target.closest ? e.target.closest('tbody.td-section') : null;
+    if (!sec) { return; }
+    clearDropHighlight();
+    sec.classList.add('td-drop-over');
+
+    var rows = Array.prototype.filter.call(sec.querySelectorAll('tr.td-row'), function (r) { return r !== dragRow; });
     var target = null;
     for (var i = 0; i < rows.length; i++) {
       var box = rows[i].getBoundingClientRect();
       if (e.clientY < box.top + box.height / 2) { target = rows[i]; break; }
     }
-    if (target) { body.insertBefore(dragRow, target); } else { body.appendChild(dragRow); }
+    if (target) {
+      if (dragRow.nextElementSibling !== target || dragRow.parentNode !== sec) { sec.insertBefore(dragRow, target); }
+    } else if (dragRow.parentNode !== sec || sec.lastElementChild !== dragRow) {
+      sec.appendChild(dragRow);
+    }
+    refreshSections();
   });
-  body.addEventListener('drop', function (e) { e.preventDefault(); });
+  table.addEventListener('drop', function (e) {
+    if (!dragRow) { return; }
+    e.preventDefault();
+    dropped = true;
+  });
 
-  function saveOrder(ids) {
+  function saveOrder(items) {
     var map = {};
-    todos.forEach(function (t) { map[t.id] = t; });
-    var prev = todos.slice();
-    todos = ids.map(function (id) { return map[id]; });
-    api('reorder', { ids: ids.join(',') }).then(clearErrors).catch(function (e) {
-      todos = prev; render(); showError(e);
+    todos.forEach(function (t) { map[String(t.id)] = t; });
+    var prev = todos.map(function (t) { return { t: t, type: t.todo_type }; });
+    todos = items.map(function (s) {
+      var p = s.split(':');
+      var t = map[p[0]];
+      t.todo_type = p[1];
+      return t;
+    });
+    api('reorder', { items: items.join(',') }).then(clearErrors).catch(function (e) {
+      prev.forEach(function (p) { p.t.todo_type = p.type; });
+      todos = prev.map(function (p) { return p.t; });
+      render(); showError(e);
     });
   }
 
@@ -291,7 +454,7 @@ $todos_when_options = [
     var name = newName.value.trim();
     if (!name) { newName.focus(); return; }
     addBtn.disabled = true;
-    api('add', { todo_name: name, todo_when: newWhen.value }).then(function (res) {
+    api('add', { todo_name: name, todo_when: newWhen.value, todo_type: newType.value }).then(function (res) {
       todos.push(res.todo); render();
       newName.value = ''; newWhen.value = ''; newName.focus(); clearErrors();
     }).catch(function (e) { showError(e, addTodo); }).then(function () { addBtn.disabled = false; });
@@ -301,14 +464,15 @@ $todos_when_options = [
 
   /* ---------- initial load ---------- */
   function load() {
-    api('list').then(function (res) { todos = res.todos; render(); clearErrors(); })
-      .catch(function (e) {
-        body.innerHTML = '';
-        var tr = document.createElement('tr'); var td = document.createElement('td');
-        td.colSpan = 5; td.className = 'td-empty'; td.textContent = 'Your list could not be loaded.';
-        tr.appendChild(td); body.appendChild(tr);
-        showError(e, load);
-      });
+    loadingBox.textContent = 'Loading…';
+    loadingBox.hidden = false;
+    api('list').then(function (res) {
+      todos = res.todos; render();
+      loadingBox.hidden = true; table.hidden = false; clearErrors();
+    }).catch(function (e) {
+      loadingBox.textContent = 'Your list could not be loaded.';
+      showError(e, load);
+    });
   }
   load();
 })();

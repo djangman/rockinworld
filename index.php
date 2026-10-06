@@ -217,20 +217,21 @@ try {
     
   }
   
-  .priority-row iframe {
-    flex: 0 0 55%;
+  .priority-row #td-app {
+    flex: 0 0 65%;
     /* width: 45%; */
     /* min-height: 700px; */
-    height: 750px;
+    /* height: 750px;
     border: 0;
     display: block;
-    border: 2px solid #bfe3f6;
+    border: 2px solid #bfe3f6; */
   }
   .priority-row .hero-text {
     flex: 1 1 0;
     min-width: 0;
     font-size: 18px;
     text-align: left;
+    margin-top: 54px;
     display: block;
     background: linear-gradient(135deg, #edf9ff 0%, #dff3ff 100%);
     border: 2px solid #bfe3f6;
@@ -430,6 +431,7 @@ try {
 
 <div class="priority-row">
     <?php include "embed_todoapp/todos.php"; ?>
+    
 
     <div class="hero-text">
       <strong style="color: blue;">The Most Important Priorities</strong>

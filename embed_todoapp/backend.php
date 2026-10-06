@@ -4,23 +4,25 @@
  *
  * Actions (all return JSON):
  *   GET  ?action=list
- *   POST action=add      todo_name, todo_when
- *   POST action=update   id, [todo_name], [todo_when]
+ *   POST action=add      todo_name, todo_when, todo_type
+ *   POST action=update   id, [todo_name], [todo_when], [todo_type]
  *   POST action=toggle   id, done (0|1)
  *   POST action=delete   id
- *   POST action=reorder  ids (comma separated, in the new order)
+ *   POST action=reorder  items ("id:type,id:type,..." in the new overall order)
  *
  * Success: {"ok":true, ...}
  * Failure: {"ok":false,"error":{"type","title","message","hint"}}
  */
 declare(strict_types=1);
 
+include __DIR__ . '/db_values.php';
+
 // ---- CONFIGURATION: edit these ------------------------------------------
-const DB_HOST    = 'localhost';
-const DB_NAME    = 'skwazlwj_rocktodo';
-const DB_USER    = 'skwazlwj_todosteve';
-const DB_PASS    = 'roadtripcarnie';
-const DB_CHARSET = 'utf8mb4';
+define('DB_HOST', $db_config_array['DB_HOST']);
+define('DB_NAME', $db_config_array['DB_NAME']);
+define('DB_USER', $db_config_array['DB_USER']);
+define('DB_PASS', $db_config_array['DB_PASS']);
+define('DB_CHARSET', $db_config_array['DB_CHARSET']);
 // -------------------------------------------------------------------------
 
 // Never let PHP warnings/notices corrupt the JSON output.
@@ -35,6 +37,8 @@ const WHEN_OPTIONS = [
     'Next Friday', 'Next Saturday', 'Next Sunday',
     'Next Weekend', 'Next Month',
 ];
+
+const TYPE_OPTIONS = ['normal', 'repeating', 'future'];
 
 function respond(array $payload, int $status = 200): never
 {
@@ -59,6 +63,7 @@ function row_out(array $r): array
         'id'         => (int)$r['id'],
         'todo_name'  => (string)$r['todo_name'],
         'todo_when'  => $r['todo_when'] === null ? '' : (string)$r['todo_when'],
+        'todo_type'  => (string)$r['todo_type'],
         'done'       => (int)$r['done'] === 1,
         'sort_order' => (int)$r['sort_order'],
     ];
@@ -72,6 +77,15 @@ function clean_when(mixed $v): ?string
     }
     if (!in_array($v, WHEN_OPTIONS, true)) {
         fail('validation', 'Invalid day', 'That "when" option is not recognized.', '', 422);
+    }
+    return $v;
+}
+
+function clean_type(mixed $v): string
+{
+    $v = trim((string)$v);
+    if (!in_array($v, TYPE_OPTIONS, true)) {
+        fail('validation', 'Invalid type', 'To-do type must be normal, repeating or future.', '', 422);
     }
     return $v;
 }
@@ -130,15 +144,21 @@ try {
 try {
     // Created on first use. Note: `order` is a reserved word in SQL, so the column is sort_order.
     $pdo->exec(
-        'CREATE TABLE IF NOT EXISTS todos (
+        "CREATE TABLE IF NOT EXISTS todos (
             id         INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             todo_name  VARCHAR(255) NOT NULL,
             todo_when  VARCHAR(20)  NULL DEFAULT NULL,
+            todo_type  VARCHAR(10)  NOT NULL DEFAULT 'normal',
             done       TINYINT(1)   NOT NULL DEFAULT 0,
             sort_order INT          NOT NULL DEFAULT 0,
             KEY idx_sort (sort_order)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
     );
+
+    // Upgrade path for tables created before todo_type existed (needs ALTER privilege once).
+    if (!$pdo->query("SHOW COLUMNS FROM todos LIKE 'todo_type'")->fetch()) {
+        $pdo->exec("ALTER TABLE todos ADD COLUMN todo_type VARCHAR(10) NOT NULL DEFAULT 'normal' AFTER todo_when");
+    }
 
     switch ($action) {
         case 'list':
@@ -148,9 +168,10 @@ try {
         case 'add':
             $name = clean_name($_POST['todo_name'] ?? '');
             $when = clean_when($_POST['todo_when'] ?? '');
+            $type = clean_type($_POST['todo_type'] ?? 'normal');
             $next = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM todos')->fetchColumn();
-            $st = $pdo->prepare('INSERT INTO todos (todo_name, todo_when, done, sort_order) VALUES (?, ?, 0, ?)');
-            $st->execute([$name, $when, $next]);
+            $st = $pdo->prepare('INSERT INTO todos (todo_name, todo_when, todo_type, done, sort_order) VALUES (?, ?, ?, 0, ?)');
+            $st->execute([$name, $when, $type, $next]);
             $id = (int)$pdo->lastInsertId();
             $row = $pdo->prepare('SELECT * FROM todos WHERE id = ?');
             $row->execute([$id]);
@@ -167,6 +188,10 @@ try {
             if (array_key_exists('todo_when', $_POST)) {
                 $sets[] = 'todo_when = ?';
                 $args[] = clean_when($_POST['todo_when']);
+            }
+            if (array_key_exists('todo_type', $_POST)) {
+                $sets[] = 'todo_type = ?';
+                $args[] = clean_type($_POST['todo_type']);
             }
             if (!$sets) {
                 fail('validation', 'Nothing to update', 'No fields were provided.', '', 400);
@@ -187,17 +212,27 @@ try {
             respond(['ok' => true]);
 
         case 'reorder':
-            $ids = array_values(array_filter(
-                array_map('intval', explode(',', (string)($_POST['ids'] ?? ''))),
-                fn($n) => $n > 0
-            ));
-            if (!$ids) {
-                fail('validation', 'Bad request', 'No ids were provided for reordering.', '', 400);
+            // items = "12:normal,7:repeating,3:future" - overall order, and each item's (possibly new) type.
+            $items = [];
+            foreach (explode(',', (string)($_POST['items'] ?? '')) as $pair) {
+                if ($pair === '') {
+                    continue;
+                }
+                $bits = explode(':', $pair);
+                $id   = (int)($bits[0] ?? 0);
+                $type = $bits[1] ?? '';
+                if ($id < 1 || !in_array($type, TYPE_OPTIONS, true)) {
+                    fail('validation', 'Bad request', 'The reorder request was malformed.', '', 400);
+                }
+                $items[] = [$id, $type];
+            }
+            if (!$items) {
+                fail('validation', 'Bad request', 'No items were provided for reordering.', '', 400);
             }
             $pdo->beginTransaction();
-            $st = $pdo->prepare('UPDATE todos SET sort_order = ? WHERE id = ?');
-            foreach ($ids as $i => $id) {
-                $st->execute([$i + 1, $id]);
+            $st = $pdo->prepare('UPDATE todos SET sort_order = ?, todo_type = ? WHERE id = ?');
+            foreach ($items as $i => [$id, $type]) {
+                $st->execute([$i + 1, $type, $id]);
             }
             $pdo->commit();
             respond(['ok' => true]);
