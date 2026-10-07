@@ -8,13 +8,11 @@
  *   POST action=update   id, [todo_name], [todo_when], [todo_type]
  *   POST action=toggle   id, done (0|1)
  *   POST action=delete   id
- *   POST action=reorder  items ("id:type,id:type,..." in the new overall order)
  *
  * Success: {"ok":true, ...}
  * Failure: {"ok":false,"error":{"type","title","message","hint"}}
  */
 declare(strict_types=1);
-
 include __DIR__ . '/db_values.php';
 
 // ---- CONFIGURATION: edit these ------------------------------------------
@@ -23,7 +21,6 @@ define('DB_NAME', $db_config_array['DB_NAME']);
 define('DB_USER', $db_config_array['DB_USER']);
 define('DB_PASS', $db_config_array['DB_PASS']);
 define('DB_CHARSET', $db_config_array['DB_CHARSET']);
-// -------------------------------------------------------------------------
 
 // Never let PHP warnings/notices corrupt the JSON output.
 ini_set('display_errors', '0');
@@ -32,13 +29,13 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
 const WHEN_OPTIONS = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+    'Today', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
     'Next Monday', 'Next Tuesday', 'Next Wednesday', 'Next Thursday',
     'Next Friday', 'Next Saturday', 'Next Sunday',
     'Next Weekend', 'Next Month',
 ];
 
-const TYPE_OPTIONS = ['normal', 'repeating', 'future'];
+const TYPE_OPTIONS = ['normal', 'errand', 'repeating', 'future'];
 
 function respond(array $payload, int $status = 200): never
 {
@@ -85,7 +82,7 @@ function clean_type(mixed $v): string
 {
     $v = trim((string)$v);
     if (!in_array($v, TYPE_OPTIONS, true)) {
-        fail('validation', 'Invalid type', 'To-do type must be normal, repeating or future.', '', 422);
+        fail('validation', 'Invalid type', 'To-do type must be normal, errand, repeating or future.', '', 422);
     }
     return $v;
 }
@@ -142,7 +139,8 @@ try {
 
 // ---- Handle the request ----------------------------------------------------
 try {
-    // Created on first use. Note: `order` is a reserved word in SQL, so the column is sort_order.
+    // Created on first use. sort_order is no longer used for display (the UI sorts by todo_when);
+    // the column is kept so existing tables keep working.
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS todos (
             id         INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -162,7 +160,7 @@ try {
 
     switch ($action) {
         case 'list':
-            $rows = $pdo->query('SELECT * FROM todos ORDER BY sort_order ASC, id ASC')->fetchAll();
+            $rows = $pdo->query('SELECT * FROM todos ORDER BY id ASC')->fetchAll();
             respond(['ok' => true, 'todos' => array_map('row_out', $rows)]);
 
         case 'add':
@@ -209,32 +207,6 @@ try {
         case 'delete':
             $id = need_id();
             $pdo->prepare('DELETE FROM todos WHERE id = ?')->execute([$id]);
-            respond(['ok' => true]);
-
-        case 'reorder':
-            // items = "12:normal,7:repeating,3:future" - overall order, and each item's (possibly new) type.
-            $items = [];
-            foreach (explode(',', (string)($_POST['items'] ?? '')) as $pair) {
-                if ($pair === '') {
-                    continue;
-                }
-                $bits = explode(':', $pair);
-                $id   = (int)($bits[0] ?? 0);
-                $type = $bits[1] ?? '';
-                if ($id < 1 || !in_array($type, TYPE_OPTIONS, true)) {
-                    fail('validation', 'Bad request', 'The reorder request was malformed.', '', 400);
-                }
-                $items[] = [$id, $type];
-            }
-            if (!$items) {
-                fail('validation', 'Bad request', 'No items were provided for reordering.', '', 400);
-            }
-            $pdo->beginTransaction();
-            $st = $pdo->prepare('UPDATE todos SET sort_order = ?, todo_type = ? WHERE id = ?');
-            foreach ($items as $i => [$id, $type]) {
-                $st->execute([$i + 1, $type, $id]);
-            }
-            $pdo->commit();
             respond(['ok' => true]);
 
         default:

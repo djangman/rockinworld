@@ -13,7 +13,7 @@
  */
 $todos_backend_url = $todos_backend_url ?? 'embed_todoapp/backend.php';
 $todos_when_options = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+    'Today', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
     'Next Monday', 'Next Tuesday', 'Next Wednesday', 'Next Thursday',
     'Next Friday', 'Next Saturday', 'Next Sunday',
     'Next Weekend', 'Next Month',
@@ -21,11 +21,16 @@ $todos_when_options = [
 // type value => section heading
 $todos_types = [
     'normal'    => 'Normal',
+    'errand'    => 'Errands',
     'repeating' => 'Repeating',
     'future'    => 'Future Tasks',
 ];
+
 ?>
 <style>
+#td-app {
+    zoom: 0.75; /* Scales everything down to 80% of its original size */
+}
 #td-app { --td-accent:#3b6ef5; --td-border:#e3e6ec; --td-muted:#7a8394; --td-bg:#fff; --td-hover:#f6f8fc;
   max-width:800px; margin:1rem auto; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:#1f2430; }
 #td-app * { box-sizing:border-box; }
@@ -52,19 +57,17 @@ $todos_types = [
 #td-app tbody[data-type=future] .td-sec-head th { --sec:#8a5cf6; }
 #td-app .td-sec-count { display:inline-block; margin-left:.5rem; min-width:1.5rem; padding:0 .45rem; border-radius:999px; background:var(--sec,#3b6ef5); color:#fff; font-size:.75rem; line-height:1.4rem; text-align:center; vertical-align:middle; }
 #td-app .td-sec-empty td { text-align:center; color:var(--td-muted); font-style:italic; font-size:.9rem; padding:.9rem; }
-#td-app tbody.td-drop-over .td-sec-head th { box-shadow:inset 0 0 0 2px var(--sec); }
 
-#td-app .td-handle { width:28px; text-align:center; color:#a3abba; cursor:grab; user-select:none; font-size:1.1rem; }
 #td-app .td-check { width:44px; text-align:center; }
 #td-app .td-check input { width:18px; height:18px; cursor:pointer; accent-color:var(--td-accent); }
 #td-app .td-name input { width:100%; border-color:transparent; background:transparent; }
 #td-app .td-name input:hover { border-color:var(--td-border); }
 #td-app tr.td-done .td-name input { text-decoration:line-through; color:var(--td-muted); }
-#td-app .td-when select { width:100%; }
+#td-app .td-when select, #td-app .td-type select { width:100%; }
+#td-app .td-type { width:130px; }
 #td-app .td-del { width:40px; text-align:center; }
 #td-app .td-del button { background:transparent; color:#b4bbc9; padding:.2rem .5rem; font-size:1rem; }
 #td-app .td-del button:hover { color:#d64545; background:#fdeeee; }
-#td-app tr.td-dragging td { opacity:.4; background:#eaf0ff; }
 
 /* error banner */
 #td-app .td-error { display:flex; gap:.8rem; align-items:flex-start; margin:0 0 1rem; padding:.9rem 1rem; border-radius:12px;
@@ -129,12 +132,12 @@ $todos_types = [
 
   <table id="td-table" hidden>
     <thead>
-      <tr><th></th><th>Done</th><th>To-do</th><th>When</th><th></th></tr>
+      <tr><th>Done</th><th>To-do</th><th>Type</th><th>When</th><th></th></tr>
     </thead>
     <?php foreach ($todos_types as $val => $label): ?>
     <tbody class="td-section" id="td-sec-<?= htmlspecialchars($val, ENT_QUOTES) ?>" data-type="<?= htmlspecialchars($val, ENT_QUOTES) ?>">
       <tr class="td-sec-head"><th colspan="5"><span class="td-sec-title"><?= htmlspecialchars($label) ?></span><span class="td-sec-count">0</span></th></tr>
-      <tr class="td-sec-empty"><td colspan="5">Nothing here yet. Add one above or drag a task in.</td></tr>
+      <tr class="td-sec-empty"><td colspan="5">Nothing here yet. Add one above.</td></tr>
     </tbody>
     <?php endforeach; ?>
   </table>
@@ -146,6 +149,7 @@ $todos_types = [
   var BACKEND = root.getAttribute('data-backend');
   var WHEN = <?= json_encode($todos_when_options) ?>;
   var TYPES = <?= json_encode(array_keys($todos_types)) ?>;
+  var TYPE_LABELS = <?= json_encode($todos_types) ?>;
   var table = document.getElementById('td-table');
   var loadingBox = document.getElementById('td-loading');
   var errBox = document.getElementById('td-errors');
@@ -156,6 +160,38 @@ $todos_types = [
   var secs = {};
   TYPES.forEach(function (t) { secs[t] = document.getElementById('td-sec-' + t); });
   var todos = [];
+
+  /* ---------- sort order: items are sorted by their "when" value ---------- */
+  var todos_when_options_sort_order = {
+    'Today':         -1,
+    'Monday':         0,
+    'Tuesday':        1,
+    'Wednesday':      2,
+    'Thursday':       3,
+    'Friday':         4,
+    'Saturday':       5,
+    'Sunday':         6,
+    'Next Monday':    7,
+    'Next Tuesday':   8,
+    'Next Wednesday': 9,
+    'Next Thursday':  10,
+    'Next Friday':    11,
+    'Next Saturday':  12,
+    'Next Sunday':    13,
+    'Next Weekend':   14,
+    'Next Month':     15,
+    '— No day —':     16,
+  };
+  var NO_DAY_RANK = 99;   // items with no "when" sort last
+
+  function whenRank(w) {
+    return Object.prototype.hasOwnProperty.call(todos_when_options_sort_order, w)
+      ? todos_when_options_sort_order[w] : NO_DAY_RANK;
+  }
+  // by "when", then by id (creation order) so ties stay stable
+  function sortTodos() {
+    todos.sort(function (a, b) { return (whenRank(a.todo_when) - whenRank(b.todo_when)) || (a.id - b.id); });
+  }
 
   /* ---------- ajax helper (no page loads, ever) ---------- */
   function api(action, data) {
@@ -282,10 +318,6 @@ $todos_types = [
     tr.className = 'td-row' + (t.done ? ' td-done' : '');
     tr.setAttribute('data-id', t.id);
 
-    var h = document.createElement('td'); h.className = 'td-handle'; h.title = 'Drag to reorder or move to another section'; h.textContent = '⋮⋮';
-    h.addEventListener('mousedown', function () { tr.draggable = true; });
-    h.addEventListener('mouseup', function () { tr.draggable = false; });
-
     var c = document.createElement('td'); c.className = 'td-check';
     var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!t.done;
     cb.addEventListener('change', function () {
@@ -323,10 +355,25 @@ $todos_types = [
     sel.addEventListener('change', function () {
       var v = sel.value;
       api('update', { id: t.id, todo_when: v }).then(function () {
-        t.todo_when = v; clearErrors();
+        t.todo_when = v; clearErrors(); render();   // re-sort into place
       }).catch(function (e) { sel.value = t.todo_when; showError(e); });
     });
     w.appendChild(sel);
+
+    var ty = document.createElement('td'); ty.className = 'td-type';
+    var tsel = document.createElement('select');
+    TYPES.forEach(function (k) {
+      var op = document.createElement('option'); op.value = k; op.textContent = TYPE_LABELS[k];
+      if (k === t.todo_type) { op.selected = true; }
+      tsel.appendChild(op);
+    });
+    tsel.addEventListener('change', function () {
+      var v = tsel.value;
+      api('update', { id: t.id, todo_type: v }).then(function () {
+        t.todo_type = v; clearErrors(); render();   // move to the matching section
+      }).catch(function (e) { tsel.value = t.todo_type; showError(e); });
+    });
+    ty.appendChild(tsel);
 
     var d = document.createElement('td'); d.className = 'td-del';
     var db = document.createElement('button'); db.type = 'button'; db.title = 'Delete'; db.setAttribute('aria-label', 'Delete'); db.textContent = '✕';
@@ -347,24 +394,8 @@ $todos_types = [
     });
     d.appendChild(db);
 
-    tr.appendChild(h); tr.appendChild(c); tr.appendChild(n); tr.appendChild(w); tr.appendChild(d);
+    tr.appendChild(c); tr.appendChild(n); tr.appendChild(ty); tr.appendChild(w); tr.appendChild(d);
 
-    /* drag events */
-    tr.addEventListener('dragstart', function (e) {
-      dragRow = tr; dropped = false; startKey = currentItems().join(',');
-      tr.classList.add('td-dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', String(t.id)); } catch (x) {}
-    });
-    tr.addEventListener('dragend', function () {
-      tr.classList.remove('td-dragging'); tr.draggable = false;
-      clearDropHighlight();
-      var items = currentItems();
-      var wasDropped = dropped;
-      dragRow = null;
-      if (!wasDropped) { render(); return; }               // drag cancelled: restore
-      if (items.join(',') !== startKey) { saveOrder(items); }
-    });
     return tr;
   }
 
@@ -378,75 +409,13 @@ $todos_types = [
   }
 
   function render() {
+    sortTodos();
     TYPES.forEach(function (type) {
       var sec = secs[type];
       Array.prototype.slice.call(sec.querySelectorAll('tr.td-row')).forEach(function (r) { r.remove(); });
       todos.forEach(function (t) { if (t.todo_type === type) { sec.appendChild(buildRow(t)); } });
     });
     refreshSections();
-  }
-
-  /* ---------- drag-and-drop (native HTML5, no library) ---------- */
-  var dragRow = null, startKey = '', dropped = false;
-
-  // "id:type" for every row, in on-screen order (sections top to bottom).
-  function currentItems() {
-    var out = [];
-    TYPES.forEach(function (type) {
-      Array.prototype.forEach.call(secs[type].querySelectorAll('tr.td-row'), function (r) {
-        out.push(r.getAttribute('data-id') + ':' + type);
-      });
-    });
-    return out;
-  }
-
-  function clearDropHighlight() {
-    TYPES.forEach(function (type) { secs[type].classList.remove('td-drop-over'); });
-  }
-
-  table.addEventListener('dragover', function (e) {
-    if (!dragRow) { return; }
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    var sec = e.target.closest ? e.target.closest('tbody.td-section') : null;
-    if (!sec) { return; }
-    clearDropHighlight();
-    sec.classList.add('td-drop-over');
-
-    var rows = Array.prototype.filter.call(sec.querySelectorAll('tr.td-row'), function (r) { return r !== dragRow; });
-    var target = null;
-    for (var i = 0; i < rows.length; i++) {
-      var box = rows[i].getBoundingClientRect();
-      if (e.clientY < box.top + box.height / 2) { target = rows[i]; break; }
-    }
-    if (target) {
-      if (dragRow.nextElementSibling !== target || dragRow.parentNode !== sec) { sec.insertBefore(dragRow, target); }
-    } else if (dragRow.parentNode !== sec || sec.lastElementChild !== dragRow) {
-      sec.appendChild(dragRow);
-    }
-    refreshSections();
-  });
-  table.addEventListener('drop', function (e) {
-    if (!dragRow) { return; }
-    e.preventDefault();
-    dropped = true;
-  });
-
-  function saveOrder(items) {
-    var map = {};
-    todos.forEach(function (t) { map[String(t.id)] = t; });
-    var prev = todos.map(function (t) { return { t: t, type: t.todo_type }; });
-    todos = items.map(function (s) {
-      var p = s.split(':');
-      var t = map[p[0]];
-      t.todo_type = p[1];
-      return t;
-    });
-    api('reorder', { items: items.join(',') }).then(clearErrors).catch(function (e) {
-      prev.forEach(function (p) { p.t.todo_type = p.type; });
-      todos = prev.map(function (p) { return p.t; });
-      render(); showError(e);
-    });
   }
 
   /* ---------- add ---------- */
