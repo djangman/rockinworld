@@ -3,19 +3,14 @@
  * backend.php - AJAX/JSON endpoint for the to-do list (todos.php).
  *
  * Actions (all return JSON):
- *   GET  ?action=list                 (todos, each with a nested "subtasks" array)
- *   POST action=add                   todo_name, todo_when, todo_type
- *   POST action=update                id, [todo_name], [todo_when], [todo_type]
- *   POST action=toggle                id, done (0|1)
- *   POST action=delete_done           (deletes every to-do marked done, plus their subtasks)
- *   POST action=add_subtask           todo_id, subtask_name
- *   POST action=update_subtask        id, subtask_name
- *   POST action=toggle_subtask        id, done (0|1)
+ *   GET  ?action=list
+ *   POST action=add      todo_name, todo_when, todo_type
+ *   POST action=update   id, [todo_name], [todo_when], [todo_type]
+ *   POST action=toggle   id, done (0|1)
+ *   POST action=delete   id
  *
  * Success: {"ok":true, ...}
  * Failure: {"ok":false,"error":{"type","title","message","hint"}}
- *
- * The `subtasks` table must exist (see the CREATE TABLE statement supplied with this update).
  */
 declare(strict_types=1);
 include __DIR__ . '/db_values.php';
@@ -59,7 +54,7 @@ function fail(string $type, string $title, string $message, string $hint = '', i
     ]], $status);
 }
 
-function row_out(array $r, array $subtasks = []): array
+function row_out(array $r): array
 {
     return [
         'id'         => (int)$r['id'],
@@ -68,17 +63,6 @@ function row_out(array $r, array $subtasks = []): array
         'todo_type'  => (string)$r['todo_type'],
         'done'       => (int)$r['done'] === 1,
         'sort_order' => (int)$r['sort_order'],
-        'subtasks'   => $subtasks,
-    ];
-}
-
-function sub_out(array $r): array
-{
-    return [
-        'id'           => (int)$r['id'],
-        'todo_id'      => (int)$r['todo_id'],
-        'subtask_name' => (string)$r['subtask_name'],
-        'done'         => (int)$r['done'] === 1,
     ];
 }
 
@@ -103,21 +87,21 @@ function clean_type(mixed $v): string
     return $v;
 }
 
-function clean_name(mixed $v, string $label = 'to-do item'): string
+function clean_name(mixed $v): string
 {
     $v = trim((string)$v);
     if ($v === '') {
-        fail('validation', 'Name required', 'Please enter a name for the ' . $label . '.', '', 422);
+        fail('validation', 'Name required', 'Please enter a name for the to-do item.', '', 422);
     }
     if (mb_strlen($v) > 255) {
-        fail('validation', 'Name too long', 'A name can be at most 255 characters.', '', 422);
+        fail('validation', 'Name too long', 'A to-do name can be at most 255 characters.', '', 422);
     }
     return $v;
 }
 
-function need_id(string $key = 'id'): int
+function need_id(): int
 {
-    $id = filter_var($_POST[$key] ?? null, FILTER_VALIDATE_INT);
+    $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
     if ($id === false || $id === null || $id < 1) {
         fail('validation', 'Bad request', 'Missing or invalid item id.', '', 400);
     }
@@ -177,14 +161,7 @@ try {
     switch ($action) {
         case 'list':
             $rows = $pdo->query('SELECT * FROM todos ORDER BY id ASC')->fetchAll();
-            $subs = [];
-            foreach ($pdo->query('SELECT * FROM subtasks ORDER BY sort_order ASC, id ASC') as $s) {
-                $subs[(int)$s['todo_id']][] = sub_out($s);
-            }
-            respond(['ok' => true, 'todos' => array_map(
-                fn(array $r): array => row_out($r, $subs[(int)$r['id']] ?? []),
-                $rows
-            )]);
+            respond(['ok' => true, 'todos' => array_map('row_out', $rows)]);
 
         case 'add':
             $name = clean_name($_POST['todo_name'] ?? '');
@@ -227,46 +204,10 @@ try {
             $pdo->prepare('UPDATE todos SET done = ? WHERE id = ?')->execute([$done, $id]);
             respond(['ok' => true, 'done' => $done === 1]);
 
-        case 'delete_done':
-            $pdo->beginTransaction();
-            $ids = $pdo->query('SELECT id FROM todos WHERE done = 1')->fetchAll(PDO::FETCH_COLUMN);
-            if ($ids) {
-                // Explicit subtask delete as well, so this works even if the FK cascade is missing.
-                $pdo->exec('DELETE FROM subtasks WHERE todo_id IN (SELECT id FROM todos WHERE done = 1)');
-                $pdo->exec('DELETE FROM todos WHERE done = 1');
-            }
-            $pdo->commit();
-            respond(['ok' => true, 'deleted_ids' => array_map('intval', $ids)]);
-
-        case 'add_subtask':
-            $tid  = need_id('todo_id');
-            $name = clean_name($_POST['subtask_name'] ?? '', 'subtask');
-            $chk  = $pdo->prepare('SELECT 1 FROM todos WHERE id = ?');
-            $chk->execute([$tid]);
-            if (!$chk->fetchColumn()) {
-                fail('validation', 'Item not found', 'That to-do no longer exists, so a subtask can\'t be added to it.', 'Reload the list and try again.', 404);
-            }
-            $nx = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM subtasks WHERE todo_id = ?');
-            $nx->execute([$tid]);
-            $next = (int)$nx->fetchColumn();
-            $st = $pdo->prepare('INSERT INTO subtasks (todo_id, subtask_name, done, sort_order) VALUES (?, ?, 0, ?)');
-            $st->execute([$tid, $name, $next]);
-            $sid = (int)$pdo->lastInsertId();
-            $row = $pdo->prepare('SELECT * FROM subtasks WHERE id = ?');
-            $row->execute([$sid]);
-            respond(['ok' => true, 'subtask' => sub_out($row->fetch())]);
-
-        case 'update_subtask':
-            $id   = need_id();
-            $name = clean_name($_POST['subtask_name'] ?? '', 'subtask');
-            $pdo->prepare('UPDATE subtasks SET subtask_name = ? WHERE id = ?')->execute([$name, $id]);
+        case 'delete':
+            $id = need_id();
+            $pdo->prepare('DELETE FROM todos WHERE id = ?')->execute([$id]);
             respond(['ok' => true]);
-
-        case 'toggle_subtask':
-            $id   = need_id();
-            $done = ((string)($_POST['done'] ?? '0') === '1') ? 1 : 0;
-            $pdo->prepare('UPDATE subtasks SET done = ? WHERE id = ?')->execute([$done, $id]);
-            respond(['ok' => true, 'done' => $done === 1]);
 
         default:
             fail('validation', 'Unknown action', 'The requested action does not exist.', '', 400);
@@ -276,16 +217,6 @@ try {
         $pdo->rollBack();
     }
     error_log('[todos] DB error during "' . $action . '": ' . $e->getMessage());
-
-    // Most likely cause right after this update: the subtasks table hasn't been created yet.
-    if ((string)$e->getCode() === '42S02' && stripos($e->getMessage(), 'subtasks') !== false) {
-        fail(
-            'database',
-            'Subtasks table is missing',
-            'The database has no "subtasks" table yet, so the list can\'t be loaded or saved.',
-            'Run the CREATE TABLE subtasks statement in MySQL, then reload.'
-        );
-    }
     if ($isWrite) {
         fail(
             'database',

@@ -36,11 +36,6 @@ $todos_types = [
 #td-app * { box-sizing:border-box; }
 #td-app [hidden], #td-app .td-hide { display:none !important; }
 #td-app h2 { margin:0 0 .75rem; font-size:1.3rem; }
-#td-app .td-head { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.75rem; flex-wrap:wrap; }
-#td-app .td-head h2 { margin:0; }
-#td-app .td-clear { background:#fdeeee; color:#c93a3a; font-weight:600; border:1px solid #f5c2c2; display:inline-flex; align-items:center; gap:.4rem; transition:background .15s,color .15s; }
-#td-app .td-clear:hover:not(:disabled) { background:#e04848; color:#fff; border-color:#e04848; }
-#td-app .td-clear:disabled { opacity:.45; cursor:not-allowed; }
 #td-app .td-add { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
 #td-app .td-add input[type=text] { flex:1 1 220px; }
 #td-app input[type=text], #td-app select { padding:.5rem .6rem; border:1px solid var(--td-border); border-radius:8px; font:inherit; background:var(--td-bg); }
@@ -70,31 +65,9 @@ $todos_types = [
 #td-app tr.td-done .td-name input { text-decoration:line-through; color:var(--td-muted); }
 #td-app .td-when select, #td-app .td-type select { width:100%; }
 #td-app .td-type { width:130px; }
-
-/* expand / collapse (subtasks) */
-#td-app .td-exp { width:92px; text-align:right; white-space:nowrap; }
-#td-app .td-sub-count { display:inline-block; margin-right:.25rem; padding:0 .45rem; border-radius:999px; background:#eef1f7; color:var(--td-muted); font-size:.72rem; line-height:1.3rem; vertical-align:middle; }
-#td-app .td-exp-btn { background:transparent; color:var(--td-muted); padding:.3rem .45rem; border-radius:8px; display:inline-flex; align-items:center; vertical-align:middle; }
-#td-app .td-exp-btn:hover { background:#eef1f7; color:var(--td-accent); }
-#td-app .td-exp-btn:focus-visible { outline:3px solid #c9d6fb; }
-#td-app .td-exp-btn svg { width:18px; height:18px; transition:transform .18s ease; }
-#td-app .td-exp-btn[aria-expanded=true] { color:var(--td-accent); }
-#td-app .td-exp-btn[aria-expanded=true] svg { transform:rotate(90deg); }
-
-/* subtask panel */
-#td-app tr.td-sub > td { padding:0; background:#fafbfd; }
-#td-app .td-sub-panel { padding:.7rem .9rem .8rem 3.1rem; border-left:5px solid #dfe5f5; animation:td-in .18s ease-out; }
-#td-app .td-sub-item { display:flex; align-items:center; gap:.55rem; margin-bottom:.4rem; }
-#td-app .td-sub-item input[type=checkbox] { width:16px; height:16px; cursor:pointer; accent-color:var(--td-accent); flex:none; }
-#td-app .td-sub-item input[type=text] { flex:1 1 auto; min-width:0; }
-#td-app .td-sub-item:not(.td-sub-draft) input[type=text] { border-color:transparent; background:transparent; }
-#td-app .td-sub-item:not(.td-sub-draft) input[type=text]:hover { border-color:var(--td-border); }
-#td-app .td-sub-item.td-sub-done input[type=text] { text-decoration:line-through; color:var(--td-muted); }
-#td-app .td-sub-bullet { width:16px; text-align:center; color:#b4bbc9; flex:none; }
-#td-app .td-sub-save { background:var(--td-accent); color:#fff; font-weight:600; padding:.42rem .8rem; flex:none; }
-#td-app .td-sub-save:disabled { opacity:.6; cursor:wait; }
-#td-app .td-sub-add { background:transparent; color:var(--td-accent); font-weight:600; border:1px dashed #b9c8f5; padding:.4rem .85rem; margin-top:.2rem; }
-#td-app .td-sub-add:hover { background:#eef3ff; }
+#td-app .td-del { width:40px; text-align:center; }
+#td-app .td-del button { background:transparent; color:#b4bbc9; padding:.2rem .5rem; font-size:1rem; }
+#td-app .td-del button:hover { color:#d64545; background:#fdeeee; }
 
 /* error banner */
 #td-app .td-error { display:flex; gap:.8rem; align-items:flex-start; margin:0 0 1rem; padding:.9rem 1rem; border-radius:12px;
@@ -136,12 +109,7 @@ $todos_types = [
 </style>
 
 <div id="td-app" data-backend="<?= htmlspecialchars($todos_backend_url, ENT_QUOTES) ?>">
-  <div class="td-head">
-    <h2>To-Do List</h2>
-    <button type="button" class="td-clear" id="td-clear-btn" disabled title="Delete every to-do that is marked done">
-      <span aria-hidden="true">🧹</span><span id="td-clear-label">Delete completed</span>
-    </button>
-  </div>
+  <h2>To-Do List</h2>
   <div id="td-errors" aria-live="assertive"></div>
 
   <div class="td-add">
@@ -189,12 +157,9 @@ $todos_types = [
   var newType = document.getElementById('td-new-type');
   var newWhen = document.getElementById('td-new-when');
   var addBtn = document.getElementById('td-add-btn');
-  var clearBtn = document.getElementById('td-clear-btn');
-  var clearLabel = document.getElementById('td-clear-label');
   var secs = {};
   TYPES.forEach(function (t) { secs[t] = document.getElementById('td-sec-' + t); });
   var todos = [];
-  var expanded = {};   // todo id -> true while its subtask panel is open
 
   /* ---------- sort order: items are sorted by their "when" value ---------- */
   var todos_when_options_sort_order = {
@@ -347,143 +312,8 @@ $todos_types = [
     });
   }
 
-  /* ---------- "Delete completed" button ---------- */
-  function updateClearBtn() {
-    var n = todos.filter(function (x) { return x.done; }).length;
-    clearBtn.disabled = (n === 0);
-    clearLabel.textContent = n ? 'Delete completed (' + n + ')' : 'Delete completed';
-  }
-
-  function clearDone() {
-    var doneItems = todos.filter(function (x) { return x.done; });
-    var n = doneItems.length;
-    if (!n) { return; }
-    confirmDialog({
-      icon: '🧹',
-      title: 'Delete completed to-dos?',
-      name: n + (n === 1 ? ' completed item' : ' completed items'),
-      message: 'They and their subtasks will be permanently deleted. This can\'t be undone.',
-      confirmLabel: 'Delete ' + n,
-      cancelLabel: 'Keep them'
-    }).then(function (yes) {
-      if (!yes) { return; }
-      clearBtn.disabled = true;
-      api('delete_done').then(function (res) {
-        var gone = {};
-        (res.deleted_ids || []).forEach(function (id) { gone[id] = true; delete expanded[id]; });
-        todos = todos.filter(function (x) { return !gone[x.id]; });
-        render(); clearErrors();
-      }).catch(function (e) {
-        showError(e); updateClearBtn();
-      });
-    });
-  }
-  clearBtn.addEventListener('click', clearDone);
-
-  /* ---------- subtasks ---------- */
-  function badgeText(t) {
-    var all = t.subtasks || [];
-    if (!all.length) { return ''; }
-    var d = all.filter(function (s) { return s.done; }).length;
-    return d + '/' + all.length;
-  }
-
-  function updateBadge(t) {
-    var b = root.querySelector('tr.td-row[data-id="' + t.id + '"] .td-sub-count');
-    if (!b) { return; }
-    var txt = badgeText(t);
-    b.textContent = txt;
-    b.classList.toggle('td-hide', !txt);
-  }
-
-  // A saved subtask: checkbox + editable name.
-  function buildSubItem(t, s) {
-    var el = mk('div', 'td-sub-item' + (s.done ? ' td-sub-done' : ''));
-
-    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!s.done;
-    cb.addEventListener('change', function () {
-      var want = cb.checked;
-      api('toggle_subtask', { id: s.id, done: want ? 1 : 0 }).then(function () {
-        s.done = want; el.classList.toggle('td-sub-done', want); updateBadge(t); clearErrors();
-      }).catch(function (e) { cb.checked = !want; showError(e); });
-    });
-
-    var ni = document.createElement('input'); ni.type = 'text'; ni.value = s.subtask_name; ni.maxLength = 255;
-    ni.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { ni.blur(); }
-      if (e.key === 'Escape') { ni.value = s.subtask_name; ni.blur(); }
-    });
-    ni.addEventListener('change', function () {
-      var v = ni.value.trim();
-      if (!v) { ni.value = s.subtask_name; return; }
-      api('update_subtask', { id: s.id, subtask_name: v }).then(function () {
-        s.subtask_name = v; ni.value = v; clearErrors();
-      }).catch(function (e) { ni.value = s.subtask_name; showError(e); });
-    });
-
-    el.appendChild(cb); el.appendChild(ni);
-    return el;
-  }
-
-  // A blank entry form for one new subtask. Saved with Enter or the Save button.
-  function buildDraft(t, list) {
-    var el = mk('div', 'td-sub-item td-sub-draft');
-    el.appendChild(mk('span', 'td-sub-bullet', '•'));
-    var input = document.createElement('input'); input.type = 'text'; input.maxLength = 255;
-    input.placeholder = 'New subtask…'; input.autocomplete = 'off';
-    var save = mk('button', 'td-sub-save', 'Save'); save.type = 'button';
-
-    function commit() {
-      var v = input.value.trim();
-      if (!v) { input.focus(); return; }
-      if (save.disabled) { return; }
-      save.disabled = true;
-      api('add_subtask', { todo_id: t.id, subtask_name: v }).then(function (res) {
-        t.subtasks.push(res.subtask);
-        list.appendChild(buildSubItem(t, res.subtask));
-        el.remove(); updateBadge(t); clearErrors();
-      }).catch(function (e) {
-        save.disabled = false; showError(e, commit);
-      });
-    }
-    save.addEventListener('click', commit);
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    });
-
-    el.appendChild(input); el.appendChild(save);
-    return el;
-  }
-
-  // The expanded row under a to-do.
-  function buildSubRow(t) {
-    t.subtasks = t.subtasks || [];
-    var tr = mk('tr', 'td-sub'); tr.setAttribute('data-for', t.id);
-    var td = document.createElement('td'); td.colSpan = 5;
-    var panel = mk('div', 'td-sub-panel');
-    var list = mk('div', 'td-sub-list');
-    var drafts = mk('div', 'td-sub-drafts');
-    var add = mk('button', 'td-sub-add', '+ Add subtask'); add.type = 'button';
-
-    t.subtasks.forEach(function (s) { list.appendChild(buildSubItem(t, s)); });
-    if (!t.subtasks.length) { drafts.appendChild(buildDraft(t, list)); }   // nothing yet: show one blank form
-
-    add.addEventListener('click', function () {
-      var d = buildDraft(t, list);
-      drafts.appendChild(d);
-      d.querySelector('input').focus();
-    });
-
-    panel.appendChild(list); panel.appendChild(drafts); panel.appendChild(add);
-    td.appendChild(panel); tr.appendChild(td);
-    return tr;
-  }
-
   /* ---------- rendering ---------- */
-  var CHEVRON = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg>';
-
   function buildRow(t) {
-    t.subtasks = t.subtasks || [];
     var tr = document.createElement('tr');
     tr.className = 'td-row' + (t.done ? ' td-done' : '');
     tr.setAttribute('data-id', t.id);
@@ -493,7 +323,7 @@ $todos_types = [
     cb.addEventListener('change', function () {
       var want = cb.checked;
       api('toggle', { id: t.id, done: want ? 1 : 0 }).then(function () {
-        t.done = want; tr.classList.toggle('td-done', want); updateClearBtn(); clearErrors();
+        t.done = want; tr.classList.toggle('td-done', want); clearErrors();
       }).catch(function (e) {
         cb.checked = !want; showError(e);
       });
@@ -545,31 +375,24 @@ $todos_types = [
     });
     ty.appendChild(tsel);
 
-    // expansion icon: opens / closes this item's subtasks
-    var d = document.createElement('td'); d.className = 'td-exp';
-    var badge = mk('span', 'td-sub-count', badgeText(t));
-    badge.title = 'Subtasks done / total';
-    if (!badgeText(t)) { badge.classList.add('td-hide'); }
-    var eb = document.createElement('button'); eb.type = 'button'; eb.className = 'td-exp-btn';
-    eb.title = 'Subtasks'; eb.setAttribute('aria-label', 'Show subtasks');
-    eb.setAttribute('aria-expanded', expanded[t.id] ? 'true' : 'false');
-    eb.innerHTML = CHEVRON;
-    eb.addEventListener('click', function () {
-      var open = !expanded[t.id];
-      var next = tr.nextSibling;
-      if (open) {
-        expanded[t.id] = true;
-        var sr = buildSubRow(t);
-        tr.parentNode.insertBefore(sr, tr.nextSibling);
-        var first = sr.querySelector('.td-sub-draft input');
-        if (first) { first.focus(); }
-      } else {
-        delete expanded[t.id];
-        if (next && next.classList && next.classList.contains('td-sub')) { next.remove(); }
-      }
-      eb.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var d = document.createElement('td'); d.className = 'td-del';
+    var db = document.createElement('button'); db.type = 'button'; db.title = 'Delete'; db.setAttribute('aria-label', 'Delete'); db.textContent = '✕';
+    db.addEventListener('click', function () {
+      confirmDialog({
+        title: 'Delete this to-do?',
+        name: t.todo_name,
+        message: 'This can\'t be undone.',
+        confirmLabel: 'Delete',
+        cancelLabel: 'Keep it'
+      }).then(function (yes) {
+        if (!yes) { return; }
+        api('delete', { id: t.id }).then(function () {
+          todos = todos.filter(function (x) { return x.id !== t.id; });
+          render(); clearErrors();
+        }).catch(function (e) { showError(e); });
+      });
     });
-    d.appendChild(badge); d.appendChild(eb);
+    d.appendChild(db);
 
     tr.appendChild(c); tr.appendChild(n); tr.appendChild(ty); tr.appendChild(w); tr.appendChild(d);
 
@@ -589,15 +412,10 @@ $todos_types = [
     sortTodos();
     TYPES.forEach(function (type) {
       var sec = secs[type];
-      Array.prototype.slice.call(sec.querySelectorAll('tr.td-row, tr.td-sub')).forEach(function (r) { r.remove(); });
-      todos.forEach(function (t) {
-        if (t.todo_type !== type) { return; }
-        sec.appendChild(buildRow(t));
-        if (expanded[t.id]) { sec.appendChild(buildSubRow(t)); }
-      });
+      Array.prototype.slice.call(sec.querySelectorAll('tr.td-row')).forEach(function (r) { r.remove(); });
+      todos.forEach(function (t) { if (t.todo_type === type) { sec.appendChild(buildRow(t)); } });
     });
     refreshSections();
-    updateClearBtn();
   }
 
   /* ---------- add ---------- */
