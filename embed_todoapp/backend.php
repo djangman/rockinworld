@@ -40,7 +40,7 @@ const WHEN_OPTIONS = [
     'Next Weekend', 'Next Month',
 ];
 
-const TYPE_OPTIONS = ['normal', 'errand', 'repeating', 'future'];
+const TYPE_OPTIONS = ['normal', 'errand', 'repeating', 'traderdev', 'feature', 'future'];
 
 function respond(array $payload, int $status = 200): never
 {
@@ -98,7 +98,7 @@ function clean_type(mixed $v): string
 {
     $v = trim((string)$v);
     if (!in_array($v, TYPE_OPTIONS, true)) {
-        fail('validation', 'Invalid type', 'To-do type must be normal, errand, repeating or future.', '', 422);
+        fail('validation', 'Invalid type', 'To-do type must be normal, errand, repeating, feature or future.', '', 422);
     }
     return $v;
 }

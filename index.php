@@ -206,32 +206,27 @@ try {
     line-height: 1.5;
     margin-bottom: 10px;
   }
-  .hero-text ul { text-align: left; margin: 10px 0 0; padding-left: 30px; }
+  .hero-text ul { text-align: left; margin: 5px 0 0; padding-left: 2px; list-style: none; }
   .hero-text ul li { margin-bottom: 8px; }
   .priority-row {
     display: flex;
     align-items: flex-start;
     gap: 6px;
-    padding: 0 10px;
+    padding: 0 2px;
     width: 100%;
     
   }
   
   .priority-row #td-app {
     flex: 0 0 65%;
-    /* width: 45%; */
-    /* min-height: 700px; */
-    /* height: 750px;
-    border: 0;
-    display: block;
-    border: 2px solid #bfe3f6; */
+    
   }
   .priority-row .hero-text {
     flex: 1 1 0;
     min-width: 0;
     font-size: 18px;
     text-align: left;
-    margin-top: 54px;
+    margin-top: 49px;
     display: block;
     background: linear-gradient(135deg, #edf9ff 0%, #dff3ff 100%);
     border: 2px solid #bfe3f6;
@@ -436,11 +431,13 @@ try {
     <div class="hero-text">
       <strong style="color: blue;">The Most Important Priorities</strong>
       <ul>
-        <li>Workout and stay on carnivore diet</li>
-        <li>Nofap and Meditation</li>
+        <li>LOVE my new rental life!!!  Taking soo many walks on the street.</li>
+        <li>LOVE my new home-made ElectroLyte Drink Gig!  This is a forever fucking thing.</li>
+        <li>Workout and go Fast-Five, and then OMAD!!! For Years!</li>
+        <li>Nofap, Meditation, Regular Focusing</li>
         <li>Being the Identity of The Fulfilled Steve that is on a perpetual Vacation, with the Fun, Big Stuff even if the outside is not pleasing today!</li>
         <li>There is no concern over the outcome of any actions I'm taking. All I need to do is feel grateful for the end outcome, and take action in the NOW with bliss and peace and joy.</li>
-        <li>My happiness and outward circumstances are thankfully not reliant on google, companies, recruiters, mortgage companies, landlords, women out there ... nope! I decide baby and I love that.</li>
+        <li>My happiness, bliss, peace, and joy is not dependent on the outside world, but rather on my own inner state of being.</li>
       </ul>
     </div>
 </div>

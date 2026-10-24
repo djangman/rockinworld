@@ -23,7 +23,9 @@ $todos_types = [
     'normal'    => 'Normal',
     'errand'    => 'Errands',
     'repeating' => 'Repeating',
-    'future'    => 'Future Tasks',
+    'traderdev' => 'TraderDev Tasks',
+    'feature' => 'Feature Tasks',
+    'future'    => 'Future Tasks'
 ];
 
 ?>
@@ -41,6 +43,13 @@ $todos_types = [
 #td-app .td-clear { background:#fdeeee; color:#c93a3a; font-weight:600; border:1px solid #f5c2c2; display:inline-flex; align-items:center; gap:.4rem; transition:background .15s,color .15s; }
 #td-app .td-clear:hover:not(:disabled) { background:#e04848; color:#fff; border-color:#e04848; }
 #td-app .td-clear:disabled { opacity:.45; cursor:not-allowed; }
+#td-app .td-head-actions { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+#td-app .td-updated { font-size:.8rem; color:var(--td-muted); white-space:nowrap; }
+#td-app .td-refresh { background:#eef3ff; color:var(--td-accent); font-weight:600; border:1px solid #c9d6fb; display:inline-flex; align-items:center; gap:.4rem; transition:background .15s,color .15s; }
+#td-app .td-refresh:hover:not(:disabled) { background:var(--td-accent); color:#fff; border-color:var(--td-accent); }
+#td-app .td-refresh:disabled { opacity:.6; cursor:wait; }
+#td-app .td-refresh svg { width:16px; height:16px; }
+#td-app .td-refresh.td-spin svg { animation:td-rot .7s linear infinite; }
 #td-app .td-add { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
 #td-app .td-add input[type=text] { flex:1 1 220px; }
 #td-app input[type=text], #td-app select { padding:.5rem .6rem; border:1px solid var(--td-border); border-radius:8px; font:inherit; background:var(--td-bg); }
@@ -130,6 +139,7 @@ $todos_types = [
 #td-app .td-modal-ok:hover { background:#c93a3a; }
 #td-app .td-modal-actions button:focus-visible { outline:3px solid #c9d6fb; outline-offset:2px; }
 
+@keyframes td-rot { to { transform:rotate(360deg); } }
 @keyframes td-in { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
 @keyframes td-fade { from { opacity:0; } to { opacity:1; } }
 @keyframes td-pop { from { opacity:0; transform:scale(.94) translateY(8px); } to { opacity:1; transform:none; } }
@@ -138,9 +148,16 @@ $todos_types = [
 <div id="td-app" data-backend="<?= htmlspecialchars($todos_backend_url, ENT_QUOTES) ?>">
   <div class="td-head">
     <h2>To-Do List</h2>
-    <button type="button" class="td-clear" id="td-clear-btn" disabled title="Delete every to-do that is marked done">
-      <span aria-hidden="true">🧹</span><span id="td-clear-label">Delete completed</span>
-    </button>
+    <div class="td-head-actions">
+      <span class="td-updated" id="td-updated" title="When this list was last loaded from the database"></span>
+      <button type="button" class="td-refresh" id="td-refresh-btn" title="Reload the to-do list from the database">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 10a6.5 6.5 0 1 1-2-4.7"/><path d="M16.5 3.5v3.8h-3.8"/></svg>
+        <span>Refresh</span>
+      </button>
+      <button type="button" class="td-clear" id="td-clear-btn" disabled title="Delete every to-do that is marked done">
+        <span aria-hidden="true">🧹</span><span id="td-clear-label">Delete completed</span>
+      </button>
+    </div>
   </div>
   <div id="td-errors" aria-live="assertive"></div>
 
@@ -191,6 +208,8 @@ $todos_types = [
   var addBtn = document.getElementById('td-add-btn');
   var clearBtn = document.getElementById('td-clear-btn');
   var clearLabel = document.getElementById('td-clear-label');
+  var refreshBtn = document.getElementById('td-refresh-btn');
+  var updatedEl = document.getElementById('td-updated');
   var secs = {};
   TYPES.forEach(function (t) { secs[t] = document.getElementById('td-sec-' + t); });
   var todos = [];
@@ -614,11 +633,16 @@ $todos_types = [
   newName.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addTodo(); } });
 
   /* ---------- initial load ---------- */
+  function stamp() {
+    var d = new Date();
+    updatedEl.textContent = 'Updated ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
   function load() {
     loadingBox.textContent = 'Loading…';
     loadingBox.hidden = false;
     api('list').then(function (res) {
-      todos = res.todos; render();
+      todos = res.todos; render(); stamp();
       loadingBox.hidden = true; table.hidden = false; clearErrors();
     }).catch(function (e) {
       loadingBox.textContent = 'Your list could not be loaded.';
@@ -626,5 +650,27 @@ $todos_types = [
     });
   }
   load();
+
+  /* ---------- manual refresh (reloads only this widget, via ajax) ---------- */
+  function refresh() {
+    if (refreshBtn.disabled) { return; }
+    refreshBtn.disabled = true;
+    refreshBtn.classList.add('td-spin');
+    api('list').then(function (res) {
+      todos = res.todos;
+      // forget open panels for items that no longer exist
+      var alive = {};
+      todos.forEach(function (t) { alive[t.id] = true; });
+      Object.keys(expanded).forEach(function (id) { if (!alive[id]) { delete expanded[id]; } });
+      render(); stamp();
+      loadingBox.hidden = true; table.hidden = false; clearErrors();
+    }).catch(function (e) {
+      showError(e, refresh);
+    }).then(function () {
+      refreshBtn.disabled = false;
+      refreshBtn.classList.remove('td-spin');
+    });
+  }
+  refreshBtn.addEventListener('click', refresh);
 })();
 </script>
